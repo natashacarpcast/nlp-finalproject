@@ -17,6 +17,9 @@ nltk.download('wordnet')
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 from top2vec import Top2Vec
+import re
+import umap
+
 
 st.set_page_config(layout="wide")
 
@@ -53,11 +56,19 @@ def create_wordcloud(model_choice, model1, topic_num):
         ax.axis('off')  # Remove axis
         return fig
     if model_choice == "Top2Vec":
-        fig = model1.generate_topic_wordcloud(topic_num=topic_num, 
-                                        background_color='white', reduced=False)
+        # Top2Vec: Getting the words for a specific topic
+        topic_words, word_scores, _ = model1.get_topics(num_topics)
+        
+        # Convert the topic_words to a dictionary of word frequencies for the given topic_num
+        words_for_topic = topic_words[topic_num]  # Get words for the specific topic
+        word_freq = {word: score for word, score in zip(words_for_topic, word_scores[topic_num])}
+        wc = WordCloud(background_color="white", max_words=1000).generate_from_frequencies(word_freq)
+        # Create a figure and axis
+        fig, ax = plt.subplots(figsize=(5, 8))
+        ax.imshow(wc, interpolation='bilinear')
+        ax.axis('off')  # Remove axis
         return fig
-
-
+    
 # Apply custom CSS for aesthetics and icons
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -249,12 +260,48 @@ elif option == "Explore Topics":
             topics_df = df.groupby(['topic', 'year']).size().reset_index(name='topic_count')
             #Plot frequency
             def plot_top2vec_topic_frequency(topic):
-                topic_data = df[df['topic'] == topic]
-                plt.plot(topic_data['year'], topic_data['topic_count'], label=topic)
-                plt.xlabel('Year')
-                plt.ylabel('Frequency of Topic')
-                plt.title('Frequency of "{}" Topic Over Time'.format(labels[topic]))
-                plt.show()
+                # Create a figure and axis explicitly
+                fig, ax = plt.subplots(figsize=(4, 3))
+    
+                # Plot the topic data
+                topic_data = topics_df[topics_df['topic'] == topic]
+                ax.plot(topic_data['year'], topic_data['topic_count'], label=labels[topic])
+    
+                # Labeling the axes and setting the title
+                ax.set_xlabel('Year')
+                ax.set_ylabel('Frequency of Topic')
+                ax.set_title(f'Frequency of "{labels[topic]}" Topic Over Time')
+    
+                # Show the plot in Streamlit
+                st.pyplot(fig)
+
+            ##RENDER TOP2VEC MAIN PAGE
+                
+
+            # Get the document embeddings from Top2Vec
+            document_embeddings = model.document_vectors  # Access the document embeddings
+
+            # Use UMAP for dimensionality reduction to 2D
+            umap_model = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine')
+            reduced_embeddings = umap_model.fit_transform(document_embeddings)
+
+            # Create a scatter plot to visualize the reduced embeddings
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1], alpha=0.6, color='blue')
+
+            # Add labels to the plot (optional) for better identification
+            for i, doc in enumerate(reduced_embeddings):
+                ax.annotate(i, (doc[0], doc[1]), fontsize=8, alpha=0.7)
+
+            # Title and labels for the plot
+            ax.set_title("Document Visualization with Top2Vec (UMAP)")
+            ax.set_xlabel("UMAP Dimension 1")
+            ax.set_ylabel("UMAP Dimension 2")
+
+            #   Show the plot in Streamlit
+            st.pyplot(fig)
+
+                
 
             #Show words for each topic
             for index, topic in enumerate(topic_words_list):
@@ -262,7 +309,7 @@ elif option == "Explore Topics":
                 st.markdown(f"""
                 <div class="topic-section">
                     <h4 class="topic-header">
-                        <i class="fas fa-hashtag icon"></i> TOPIC {index + 1}
+                        <i class="fas fa-hashtag icon"></i> TOPIC {index}
                     </h4>
                     <p class="top-words"><i class="fas fa-tags icon"></i> Top Words: {words}</p>
                 </div>
@@ -276,15 +323,39 @@ elif option == "Explore Topics":
                     st.session_state[topic_toggle_key] = False
             
                 # Button to toggle topic details
-                if st.button(f"Explore Topic {index + 1} 🚀", key=topic_button_key):
+                if st.button(f"Explore Topic {index} 🚀", key=topic_button_key):
                     st.session_state[topic_toggle_key] = True
 
                 # If the topic detail flag is set, render its detailed section in a full-width container with an expander.
                 if st.session_state.get(topic_toggle_key):
                     with st.container():
-                        with st.expander(f"Topic {index + 1} Details", expanded=True):
+                        with st.expander(f"Topic {index} Details", expanded=True):
                             plot_top2vec_topic_frequency(index)
+
+                # Create two columns for the bar chart and semicircle plot
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                # WordCloud
+                                st.markdown("<h4 style='color: #3498db;'><i class='fas fa-cloud icon'></i> Word Cloud </h4>", unsafe_allow_html=True)
+                                fig_wc = create_wordcloud(model_choice, model, index)
+                                st.pyplot(fig_wc)
+
+                            with col2:
+                            # Top 10 Documents
+                                st.markdown("<h4 style='color: #3498db;'><i class='fas fa-file-alt icon'></i> Top 5 Relevant Posts </h4>", unsafe_allow_html=True)
+                                # Retrieve top 10 documents
+                                documents = model.search_documents_by_topic(index, 10, return_documents=True, reduced=False)[0]
+
+                                # Clean the documents using regex to remove "lpt"
+                                cleaned_documents = [re.sub(r'^\s*lpt\s*', '', doc, flags=re.IGNORECASE) for doc in documents]
+
+                                # Loop through to display the top 10 posts
+                                for i in range(10):  # Looping from 0 to 4 for the top 5 documents
+                                    st.write(f"📄 **Post {i + 1}**: {cleaned_documents[i]}")
                             
+
+
+
                             
                             
 
