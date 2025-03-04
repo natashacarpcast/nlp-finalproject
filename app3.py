@@ -274,33 +274,6 @@ elif option == "Explore Topics":
     
                 # Show the plot in Streamlit
                 st.pyplot(fig)
-
-            ##RENDER TOP2VEC MAIN PAGE
-                
-
-            # Get the document embeddings from Top2Vec
-            document_embeddings = model.document_vectors  # Access the document embeddings
-
-            # Use UMAP for dimensionality reduction to 2D
-            umap_model = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine')
-            reduced_embeddings = umap_model.fit_transform(document_embeddings)
-
-            # Create a scatter plot to visualize the reduced embeddings
-            fig, ax = plt.subplots(figsize=(10, 8))
-            ax.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1], alpha=0.6, color='blue')
-
-            # Add labels to the plot (optional) for better identification
-            for i, doc in enumerate(reduced_embeddings):
-                ax.annotate(i, (doc[0], doc[1]), fontsize=8, alpha=0.7)
-
-            # Title and labels for the plot
-            ax.set_title("Document Visualization with Top2Vec (UMAP)")
-            ax.set_xlabel("UMAP Dimension 1")
-            ax.set_ylabel("UMAP Dimension 2")
-
-            #   Show the plot in Streamlit
-            st.pyplot(fig)
-
                 
 
             #Show words for each topic
